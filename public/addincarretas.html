@@ -1,0 +1,18 @@
+<div id="wdcarretas" style="width:100%;height:calc(100vh - 90px);min-height:600px">
+  <iframe src="https://watchdogbimbo.netlify.app/carretas.html" title="Watchdog carretas" style="border:0;width:100%;height:100%;display:block"></iframe>
+</div>
+<script>
+/* Add-in MyGeotab: mostra o painel do Netlify dentro da plataforma */
+window.geotab = window.geotab || { addin: {} };
+window.geotab.addin = window.geotab.addin || {};
+(function () {
+  var entry = function () {
+    return {
+      initialize: function (api, state, callback) { callback(); },
+      focus: function () {},
+      blur: function () {}
+    };
+  };
+  ["addincarretas", "watchdogCarretas", "carretas"].forEach(function (n) { window.geotab.addin[n] = entry; });
+})();
+</script>

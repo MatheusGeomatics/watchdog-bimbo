@@ -5,3 +5,9 @@
 
 [functions]
   node_bundler = "esbuild"
+
+# Permite que o MyGeotab carregue as páginas do add-in
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
