@@ -62,24 +62,28 @@ export async function montar(nomeLista) {
   return { ref: agora, rows, faltando };
 }
 
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
+
 export default async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const lista = new URL(req.url).searchParams.get("lista");
   if (!listas[lista]) {
-    return Response.json({ erro: "Lista inválida. Use ?lista=carretas ou ?lista=cavalos" }, { status: 400 });
+    return Response.json({ erro: "Lista inválida. Use ?lista=carretas ou ?lista=cavalos" }, { status: 400, headers: CORS });
   }
   if (!process.env.GEOTAB_USER || !process.env.GEOTAB_PASSWORD || !process.env.GEOTAB_DATABASE) {
-    return Response.json({ erro: "Faltam as credenciais do MyGeotab nas variáveis de ambiente do Netlify." }, { status: 500 });
+    return Response.json({ erro: "Faltam as credenciais do MyGeotab nas variáveis de ambiente do Netlify." }, { status: 500, headers: CORS });
   }
   try {
     const dados = await montar(lista);
     return Response.json(dados, {
       headers: {
+        ...CORS,
         "Cache-Control": "public, max-age=0, must-revalidate",
         "Netlify-CDN-Cache-Control": "public, s-maxage=3600, stale-while-revalidate=600"
       }
     });
   } catch (e) {
-    return Response.json({ erro: "Não foi possível consultar o MyGeotab: " + e.message }, { status: 502 });
+    return Response.json({ erro: "Não foi possível consultar o MyGeotab: " + e.message }, { status: 502, headers: CORS });
   }
 };
 

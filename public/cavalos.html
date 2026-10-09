@@ -187,20 +187,24 @@ footer ul{margin:6px 0 0;padding-left:18px}
    Fora do MyGeotab este trecho não faz nada. */
 window.geotab = window.geotab || { addin: {} };
 window.geotab.addin = window.geotab.addin || {};
-window.geotab.addin.watchdogCavalos = function () {
+window.geotab.addin.__wd = function () {
   return {
     initialize: function (api, state, callback) { callback(); },
     focus: function () {},
     blur: function () {}
   };
 };
+["cavalos","watchdogCavalos","watchdogBimbo"].forEach(function (n) { window.geotab.addin[n] = window.geotab.addin.__wd; });
 </script>
 <div id="estado" class="estado">Carregando dados do MyGeotab…</div>
-<script type="module">
+<script>
+(async function(){
+const SITE="https://watchdogbimbo.netlify.app"; // endereço do site no Netlify
+const BASE=location.hostname.endsWith("netlify.app")?"":SITE;
 const $=id=>document.getElementById(id);
 let J;
 try{
-  const r=await fetch("/api/dados?lista=cavalos",{cache:"no-store"});
+  const r=await fetch(BASE+"/api/dados?lista=cavalos",{cache:"no-store"});
   J=await r.json();
   if(!r.ok||J.erro) throw new Error(J.erro||("Erro "+r.status));
 }catch(e){
@@ -256,6 +260,7 @@ $("q").oninput=draw; $("fu").onchange=draw;
 const seg=$("fs");
 seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fs=b.dataset.v;draw()});
 draw();
+})();
 </script>
 </body>
 </html>
