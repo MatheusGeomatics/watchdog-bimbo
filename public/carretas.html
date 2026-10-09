@@ -182,6 +182,19 @@ footer ul{margin:6px 0 0;padding-left:18px}
   </footer>
 </main>
 
+<script>
+/* Integração MyGeotab (add-in): avisa a plataforma que a página carregou.
+   Fora do MyGeotab este trecho não faz nada. */
+window.geotab = window.geotab || { addin: {} };
+window.geotab.addin = window.geotab.addin || {};
+window.geotab.addin.watchdogCarretas = function () {
+  return {
+    initialize: function (api, state, callback) { callback(); },
+    focus: function () {},
+    blur: function () {}
+  };
+};
+</script>
 <div id="estado" class="estado">Carregando dados do MyGeotab…</div>
 <script type="module">
 const $=id=>document.getElementById(id);
