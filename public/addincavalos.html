@@ -1,18 +1,13 @@
-<div id="wdcavalos" style="width:100%;height:calc(100vh - 90px);min-height:600px">
-  <iframe src="https://watchdogbimbo.netlify.app/cavalos.html" title="Watchdog cavalos" style="border:0;width:100%;height:100%;display:block"></iframe>
-</div>
-<script>
-/* Add-in MyGeotab: mostra o painel do Netlify dentro da plataforma */
-window.geotab = window.geotab || { addin: {} };
-window.geotab.addin = window.geotab.addin || {};
-(function () {
-  var entry = function () {
-    return {
-      initialize: function (api, state, callback) { callback(); },
-      focus: function () {},
-      blur: function () {}
-    };
-  };
-  ["addincavalos", "watchdogCavalos", "cavalos"].forEach(function (n) { window.geotab.addin[n] = entry; });
-})();
-</script>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Watchdog Cavalos</title>
+  <script src="addincavalos.js"></script>
+</head>
+<body>
+  <div id="wdcavalos" style="width:100%;height:calc(100vh - 90px);min-height:600px">
+    <iframe src="https://watchdogbimbo.netlify.app/cavalos.html" title="Watchdog Cavalos" style="border:0;width:100%;height:100%;display:block"></iframe>
+  </div>
+</body>
+</html>
