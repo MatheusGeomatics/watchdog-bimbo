@@ -1,0 +1,23 @@
+WATCHDOG BIMBO BRASIL - site para o Netlify
+============================================
+
+Esta pasta já está pronta. Não precisa mexer em nenhum arquivo.
+
+O que tem aqui:
+- public/         -> as páginas (início, Carretas e Cavalos)
+- netlify/        -> o "robô" que busca os dados no MyGeotab
+- config/listas.mjs -> as listas de placas (único arquivo que você
+                       vai editar no futuro, se uma placa mudar)
+
+Depois de publicado, os links ficam assim:
+  https://SEU-SITE.netlify.app/           (página inicial)
+  https://SEU-SITE.netlify.app/carretas
+  https://SEU-SITE.netlify.app/cavalos
+
+Os dados são buscados no MyGeotab automaticamente e ficam no máximo
+1 hora desatualizados.
+
+Variáveis que precisam ser cadastradas no Netlify:
+  GEOTAB_DATABASE = bimbobrasil
+  GEOTAB_USER     = (usuário de integração criado no MyGeotab)
+  GEOTAB_PASSWORD = (senha desse usuário)
