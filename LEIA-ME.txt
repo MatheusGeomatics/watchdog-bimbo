@@ -21,3 +21,12 @@ Variáveis que precisam ser cadastradas no Netlify:
   GEOTAB_DATABASE = bimbobrasil
   GEOTAB_USER     = (usuário de integração criado no MyGeotab)
   GEOTAB_PASSWORD = (senha desse usuário)
+
+WATCHDOG DE CÂMERAS (Surfsight)
+  Link: https://SEU-SITE.netlify.app/cameras
+  Variáveis extras no Netlify:
+    SURFSIGHT_EMAIL    = login da Surfsight (partner)
+    SURFSIGHT_PASSWORD = senha desse login
+    SURFSIGHT_ORG_ID   = (opcional) ID da organização Bimbo na Surfsight
+  Teste/diagnóstico: https://SEU-SITE.netlify.app/api/cameras?debug=1
+  Câmera nova: o mapeamento câmera -> veículo fica em config/cameras.mjs
