@@ -287,7 +287,7 @@ $("stat").innerHTML=Object.entries(ST).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div
 const gm=r=>`https://www.google.com/maps?q=${r.la},${r.lo}`;
 const temGps=r=>!(r.la===-1&&r.lo===-1);
 crit.sort((a,b)=>b.camH-a.camH);
-$("alerts").innerHTML=crit.length?crit.map(r=>`<div class="al"><div class="top2"><span class="pl">${esc(r.p)}</span><span class="days">câmera ${dur(r.camH)}</span></div>
+$("alerts").innerHTML=crit.length?crit.map(r=>`<div class="al"><div class="top2"><span class="pl">${esc(r.p)}</span><span class="days">${r.camH>=1e9?'câmera sem registro':'câmera '+dur(r.camH)}</span></div>
  <div class="meta"><span>${esc(r.u)} · câmera ${esc(nomeSt[r.cs]||r.cs)}</span><span>Rastreador comunicou há ${dur(r.goH)}${r.dr?` · em movimento ${r.sp} km/h`:''}</span>${r.al.length?`<span class="alw">${esc(r.alTxt)}</span>`:''}</div>
  ${temGps(r)?`<a href="${gm(r)}" target="_blank" rel="noopener">Ver posição →</a>`:''}</div>`).join(""):'<div class="allok">Nenhum veículo rodando sem câmera.</div>';
 
@@ -299,7 +299,7 @@ function draw(){
   v.sort((a,b)=>{let x=a[sk],y=b[sk]; if(sk==="ord"&&x===y){x=-a.camH;y=-b.camH} return (x>y?1:x<y?-1:0)*sd});
   $("tb").innerHTML=v.map(r=>`<tr><td><b style="color:var(--navy)">${esc(r.p)}</b></td><td>${esc(r.u)}</td>
    <td><span class="cs ${esc(r.cs)}">${esc(nomeSt[r.cs]||r.cs)}</span></td>
-   <td class="num">${r.camH>=1e9?'—':dur(r.camH)}</td><td class="num">${r.goH>=1e9?'sem vínculo':dur(r.goH)}</td>
+   <td class="num">${r.camH>=1e9?'sem registro':dur(r.camH)}</td><td class="num">${r.goH>=1e9?'sem vínculo':dur(r.goH)}</td>
    <td><span class="st ${SIT[r.s][1]}">● ${SIT[r.s][0]}</span></td>
    <td class="altd" title="${esc(r.alTxt)}">${r.al.length?esc(r.alTxt):'—'}</td>
    <td>${temGps(r)?`<a href="${gm(r)}" target="_blank" rel="noopener">Abrir</a>`:'—'}</td></tr>`).join("");
