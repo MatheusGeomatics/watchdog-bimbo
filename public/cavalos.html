@@ -105,6 +105,10 @@ footer ul{margin:6px 0 0;padding-left:18px}
 [hidden]{display:none!important}
 @media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}.row2{grid-template-columns:1fr}.ttl h1{font-size:26px}.logo{height:64px}.tools input{width:100%}.hbar{grid-template-columns:120px 1fr 54px}}
 @media print{body{background:#fff}.tools{display:none}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+.xls{font:inherit;font-weight:800;font-size:13px;padding:8px 14px;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);cursor:pointer;white-space:nowrap}
+.xls:hover{background:var(--navy);color:#fff}
+.xls:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -162,6 +166,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
         <input id="q" type="search" placeholder="Buscar placa ou serial…">
         <select id="fu"><option value="">Todas as unidades</option></select>
         <div class="seg" id="fs"><button data-v="" class="on">Todos</button><button data-v="ok">Comunicando</button><button data-v="bad">Sem comunicação</button></div>
+        <button id="xls" class="xls" type="button" title="Baixa uma planilha com os dados do painel. A aba Lista respeita os filtros aplicados.">⬇ Baixar Excel</button>
       </div>
     </div>
     <div class="scroll">
@@ -201,6 +206,7 @@ window.geotab.addin.__wd = function () {
 ["cavalos","watchdogCavalos","watchdogBimbo"].forEach(function (n) { window.geotab.addin[n] = window.geotab.addin.__wd; });
 </script>
 <div id="estado" class="estado">Carregando dados do MyGeotab…</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (async function(){
 const SITE="https://watchdogbimbo.netlify.app"; // endereço do site no Netlify
@@ -248,6 +254,51 @@ $("alerts").innerHTML=bad.length?bad.map(r=>`<div class="al"><div class="top2"><
  <a href="${gm(r)}" target="_blank" rel="noopener">Ver última posição →</a></div>`).join(""):'<div class="allok">Todos estão comunicando.</div>';
 
 let sk="h",sd=-1,fs="";
+// ---- Relatório em Excel (gerado no navegador) ----
+const xlsData=t=>{if(!t)return "";const d=t instanceof Date?t:new Date(t);if(isNaN(d))return "";return (d.getTime()-d.getTimezoneOffset()*6e4)/864e5+25569};
+const xlsNum=(h,c=1)=>h==null||h>=1e9?"":Math.round(h*Math.pow(10,c))/Math.pow(10,c);
+const xlsDia=REF=>`${REF.getFullYear()}-${String(REF.getMonth()+1).padStart(2,"0")}-${String(REF.getDate()).padStart(2,"0")}`;
+function xlsFiltros(rotSit){
+  const f=[];const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
+  const on=document.querySelector("#fs button.on");
+  if(u)f.push("Unidade: "+u);
+  if(on&&on.dataset.v)f.push("Situação: "+on.textContent.trim());
+  if(q)f.push("Busca: "+q);
+  return f.length?f.join(" · "):"Nenhum (todos os registros)";
+}
+function xlsGerar(nomeArquivo,abas){
+  const btn=document.getElementById("xls");
+  if(!window.XLSX){btn.textContent="Não foi possível gerar o Excel. Recarregue a página.";return}
+  const wb=XLSX.utils.book_new();
+  abas.forEach(a=>{
+    const ws=XLSX.utils.aoa_to_sheet([a.cab,...a.linhas]);
+    (a.datas||[]).forEach(c=>{for(let r=1;r<=a.linhas.length;r++){const cel=ws[XLSX.utils.encode_cell({r,c})];if(cel&&cel.t==="n")cel.z="dd/mm/yyyy hh:mm"}});
+    (a.pct||[]).forEach(c=>{for(let r=1;r<=a.linhas.length;r++){const cel=ws[XLSX.utils.encode_cell({r,c})];if(cel&&cel.t==="n")cel.z="0.0%"}});
+    ws["!cols"]=a.cab.map((h,i)=>({wch:(a.larg&&a.larg[i])||Math.max(12,String(h).length+2)}));
+    if(a.filtro&&a.linhas.length)ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:a.linhas.length,c:a.cab.length-1}})};
+    XLSX.utils.book_append_sheet(wb,ws,a.nome);
+  });
+  XLSX.writeFile(wb,nomeArquivo);
+  const t=btn.textContent;btn.textContent="Excel baixado";setTimeout(()=>btn.textContent=t,2500);
+}
+
+function exportar(){
+  const v=ultimaVista, n=rows.length, ok=rows.filter(r=>r.ok).length;
+  const U={};rows.forEach(r=>{U[r.u]=U[r.u]||{t:0,ok:0};U[r.u].t++;if(r.ok)U[r.u].ok++});
+  const mapa=r=>(r.la===-1&&r.lo===-1)||r.la==null?"":`https://www.google.com/maps?q=${r.la},${r.lo}`;
+  xlsGerar(`Watchdog_Cavalos_Bimbo_${xlsDia(REF)}.xlsx`,[
+    {nome:"Resumo",cab:["Item","Valor"],larg:[34,48],linhas:[
+      ["Watchdog","Cavalos · Bimbo Brasil"],["Dados consultados em (Brasília)",fmt(REF)],["Filtros aplicados na aba Lista",xlsFiltros()],
+      ["Total monitorado",n],["Comunicando (até 24h)",ok],["Sem comunicação (mais de 24h)",n-ok],
+      ["Disponibilidade",(n?ok/n*100:0).toFixed(1).replace(".",",")+"%"],["Registros na aba Lista",v.length]]},
+    {nome:"Por CV",cab:["Unidade","Total","Comunicando","Sem comunicação","Disponibilidade"],larg:[24,10,14,16,16],pct:[4],filtro:true,
+      linhas:Object.entries(U).sort((a,b)=>b[1].t-a[1].t).map(([u,x])=>[u,x.t,x.ok,x.t-x.ok,x.t?x.ok/x.t:0])},
+    {nome:"Lista",filtro:true,datas:[3],larg:[12,16,22,18,14,12,18,13,12,12,12,44],
+      cab:["Placa","Serial","Unidade","Última comunicação","Horas sem comunicar","Dias sem comunicar","Status","Em movimento","Velocidade (km/h)","Latitude","Longitude","Mapa"],
+      linhas:v.map(r=>[r.p,r.s,r.u,xlsData(r.d),xlsNum(r.h),Math.floor(r.h/24),r.ok?"Comunicando":"Sem comunicação",r.dr?"Sim":"Não",r.sp,mapa(r)?r.la:"",mapa(r)?r.lo:"",mapa(r)])}
+  ]);
+}
+let ultimaVista=[];
 function draw(){
   const q=$("q").value.trim().toLowerCase(), u=$("fu").value;
   let v=rows.filter(r=>(!u||r.u===u)&&(!fs||(fs==="ok")===r.ok)&&(!q||[r.p,r.s,r.u].join(" ").toLowerCase().includes(q)));
@@ -257,12 +308,14 @@ function draw(){
    <td><span class="st ${r.ok?'ok':'bad'}">● ${r.ok?'Comunicando':'Sem comunicação'}</span></td>
    <td class="num">${r.dr?`<span class="mv">▶ ${r.sp} km/h</span>`:'Parado'}</td>
    <td><a href="${gm(r)}" target="_blank" rel="noopener">Abrir</a></td></tr>`).join("");
+  ultimaVista=v;
   $("cnt").textContent=`${v.length} de ${rows.length} cavalos`;
 }
 document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;sd=sk===k?-sd:1;sk=k;draw()});
 $("q").oninput=draw; $("fu").onchange=draw;
 const seg=$("fs");
 seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fs=b.dataset.v;draw()});
+$("xls").onclick=exportar;
 draw();
 })();
 </script>

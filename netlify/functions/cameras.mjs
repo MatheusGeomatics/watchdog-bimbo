@@ -149,6 +149,8 @@ export async function montar(debug = false) {
       cv: maisRecente(d.lastSeenOnline, h.lastConnectedAt),
       rec: h.lastRecordingHealth === undefined ? null : h.lastRecordingHealth,
       al: (h.alarms || []).map((a) => a.details || a.code).filter(Boolean),
+      an: typeof h.auxNum === "number" ? h.auxNum : (h.auxiliaryCameras || []).length,
+      ax: (h.auxiliaryCameras || []).map((x) => ({ s: String(x.auxSerial || x.id || ""), t: x.lastConnectedAt || null })),
       vinc: !!v,
       gt: st.dateTime || null,
       dr: !!st.isDriving,
@@ -170,6 +172,8 @@ export async function montar(debug = false) {
       exemplo_device: S.devices[0] || null,
       campos_saude: Array.isArray(S.saude) && S.saude[0] ? Object.keys(S.saude[0]) : [],
       exemplo_saude: Array.isArray(S.saude) ? S.saude[0] || null : S.saude,
+      com_auxiliar: Array.isArray(S.saude) ? S.saude.filter((h) => (h.auxiliaryCameras || []).length || h.auxNum).length : 0,
+      exemplo_auxiliar: Array.isArray(S.saude) ? (S.saude.find((h) => (h.auxiliaryCameras || []).length) || {}).auxiliaryCameras || null : null,
       sem_vinculo_mygeotab: rows.filter((r) => !r.vinc).length
     };
   }
