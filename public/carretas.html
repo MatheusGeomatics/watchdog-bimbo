@@ -206,7 +206,7 @@ window.geotab.addin.__wd = function () {
 ["carretas","watchdogCarretas","watchdogBimbo"].forEach(function (n) { window.geotab.addin[n] = window.geotab.addin.__wd; });
 </script>
 <div id="estado" class="estado">Carregando dados do MyGeotab…</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script>
 (async function(){
 const SITE="https://watchdogbimbo.netlify.app"; // endereço do site no Netlify
@@ -254,11 +254,11 @@ $("alerts").innerHTML=bad.length?bad.map(r=>`<div class="al"><div class="top2"><
  <a href="${gm(r)}" target="_blank" rel="noopener">Ver última posição →</a></div>`).join(""):'<div class="allok">Todos estão comunicando.</div>';
 
 let sk="h",sd=-1,fs="";
-// ---- Relatório em Excel (gerado no navegador) ----
+// ---- Relatório em Excel formatado (ExcelJS, gerado no navegador) ----
 const xlsData=t=>{if(!t)return "";const d=t instanceof Date?t:new Date(t);if(isNaN(d))return "";return (d.getTime()-d.getTimezoneOffset()*6e4)/864e5+25569};
 const xlsNum=(h,c=1)=>h==null||h>=1e9?"":Math.round(h*Math.pow(10,c))/Math.pow(10,c);
 const xlsDia=REF=>`${REF.getFullYear()}-${String(REF.getMonth()+1).padStart(2,"0")}-${String(REF.getDate()).padStart(2,"0")}`;
-function xlsFiltros(rotSit){
+function xlsFiltros(){
   const f=[];const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
   const on=document.querySelector("#fs button.on");
   if(u)f.push("Unidade: "+u);
@@ -266,37 +266,107 @@ function xlsFiltros(rotSit){
   if(q)f.push("Busca: "+q);
   return f.length?f.join(" · "):"Nenhum (todos os registros)";
 }
-function xlsGerar(nomeArquivo,abas){
+const XC={navy:"FF263576",red:"FFE62530",ink:"FF1B2240",muted:"FF5E6584",line:"FFE3E6F0",zebra:"FFF7F8FC",white:"FFFFFFFF",tint:"FFEEF0F8"};
+const XS={ok:["FFE6F4EC","FF1E8E4E"],bad:["FFFDECEE","FFC41D27"],warn:["FFFFF1DC","FF8F5F00"],off:["FFEEF0F4","FF5E6584"],navy:["FFEEF0F8","FF263576"]};
+function xlsTom(v){
+  if(typeof v!=="string")return null;
+  const t=v.trim();
+  if(/^(Comunicando|OK|Conectada|Online|Sim)$/.test(t)||/conectadas$/.test(t))return "ok";
+  if(/^(Sem comunicação|Rodando sem câmera|Câmera sem sinal|Offline|Sem registro)$/.test(t)||/sem sinal/i.test(t))return "bad";
+  if(t==="Com alerta")return "warn";
+  if(/^(Ambos sem sinal|Sem auxiliar)$/.test(t)||/sem dados de conexão/.test(t))return "off";
+  if(t==="Standby")return "navy";
+  return null;
+}
+const xlsTomPct=p=>p>=.95?"ok":p>=.85?"warn":"bad";
+const borda={top:{style:"thin",color:{argb:XC.line}},bottom:{style:"thin",color:{argb:XC.line}},left:{style:"thin",color:{argb:XC.line}},right:{style:"thin",color:{argb:XC.line}}};
+const pinta=(c,tom)=>{const[bg,fg]=XS[tom];c.fill={type:"pattern",pattern:"solid",fgColor:{argb:bg}};c.font={...(c.font||{}),name:"Calibri",size:11,bold:true,color:{argb:fg}}};
+function xlsCabecalho(ws,titulo,sub,ncol){
+  ws.mergeCells(1,1,1,ncol);ws.mergeCells(2,1,2,ncol);
+  const a=ws.getCell(1,1);a.value=titulo;a.font={name:"Calibri",size:16,bold:true,color:{argb:XC.navy}};a.alignment={vertical:"middle"};
+  const b=ws.getCell(2,1);b.value=sub;b.font={name:"Calibri",size:10,color:{argb:XC.muted}};
+  ws.getRow(1).height=28;ws.getRow(3).height=6;
+  for(let c=1;c<=ncol;c++){ws.getCell(3,c).border={bottom:{style:"medium",color:{argb:XC.red}}}}
+}
+async function xlsGerar(nomeArquivo,abas,titulo,sub){
   const btn=document.getElementById("xls");
-  if(!window.XLSX){btn.textContent="Não foi possível gerar o Excel. Recarregue a página.";return}
-  const wb=XLSX.utils.book_new();
-  abas.forEach(a=>{
-    const ws=XLSX.utils.aoa_to_sheet([a.cab,...a.linhas]);
-    (a.datas||[]).forEach(c=>{for(let r=1;r<=a.linhas.length;r++){const cel=ws[XLSX.utils.encode_cell({r,c})];if(cel&&cel.t==="n")cel.z="dd/mm/yyyy hh:mm"}});
-    (a.pct||[]).forEach(c=>{for(let r=1;r<=a.linhas.length;r++){const cel=ws[XLSX.utils.encode_cell({r,c})];if(cel&&cel.t==="n")cel.z="0.0%"}});
-    ws["!cols"]=a.cab.map((h,i)=>({wch:(a.larg&&a.larg[i])||Math.max(12,String(h).length+2)}));
-    if(a.filtro&&a.linhas.length)ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:a.linhas.length,c:a.cab.length-1}})};
-    XLSX.utils.book_append_sheet(wb,ws,a.nome);
-  });
-  XLSX.writeFile(wb,nomeArquivo);
-  const t=btn.textContent;btn.textContent="Excel baixado";setTimeout(()=>btn.textContent=t,2500);
+  if(!window.ExcelJS){btn.textContent="Não foi possível gerar o Excel. Recarregue a página.";return}
+  const orig=btn.textContent;btn.textContent="Gerando…";btn.disabled=true;
+  try{
+    const wb=new ExcelJS.Workbook();wb.creator="GEOMATICS Gestão de Frotas";wb.created=new Date();
+    let logoId=null;
+    const img=document.querySelector("img.logo");
+    if(img&&img.src.startsWith("data:image/png;base64,"))logoId=wb.addImage({base64:img.src,extension:"png"});
+    for(const a of abas){
+      const ws=wb.addWorksheet(a.nome,{views:[{showGridLines:false}],pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0}});
+      if(a.nome==="Resumo"){
+        ws.columns=[{width:4},{width:38},{width:46}];
+        if(logoId!==null){ws.addImage(logoId,{tl:{col:1,row:0.2},ext:{width:150,height:70}})}
+        for(let r=1;r<=4;r++)ws.getRow(r).height=18;
+        const t=ws.getCell(6,2);t.value=titulo;t.font={name:"Calibri",size:18,bold:true,color:{argb:XC.navy}};
+        const s=ws.getCell(7,2);s.value=sub;s.font={name:"Calibri",size:10,color:{argb:XC.muted}};
+        ws.getCell(8,2).border={bottom:{style:"medium",color:{argb:XC.red}}};ws.getCell(8,3).border={bottom:{style:"medium",color:{argb:XC.red}}};
+        let r=10;
+        a.linhas.forEach(([k,v,tom],i)=>{
+          const ck=ws.getCell(r,2),cv=ws.getCell(r,3);
+          ck.value=k;cv.value=v;
+          ck.font={name:"Calibri",size:11,bold:true,color:{argb:XC.ink}};
+          cv.font={name:"Calibri",size:12,bold:typeof v==="number"||!!tom,color:{argb:XC.navy}};
+          cv.alignment={horizontal:typeof v==="number"?"left":"left",wrapText:true};
+          [ck,cv].forEach(c=>{c.border=borda;if(i%2)c.fill={type:"pattern",pattern:"solid",fgColor:{argb:XC.zebra}}});
+          if(tom)pinta(cv,tom);
+          ws.getRow(r).height=20;r++;
+        });
+        continue;
+      }
+      const n=a.cab.length;
+      xlsCabecalho(ws,`${titulo} · ${a.nome}`,sub,n);
+      ws.columns=a.cab.map((h,i)=>({width:(a.larg&&a.larg[i])||Math.max(12,String(h).length+2)}));
+      const H=4;
+      const hr=ws.getRow(H);hr.values=a.cab;hr.height=30;
+      hr.eachCell(c=>{c.fill={type:"pattern",pattern:"solid",fgColor:{argb:XC.navy}};c.font={name:"Calibri",size:11,bold:true,color:{argb:XC.white}};c.alignment={vertical:"middle",horizontal:"center",wrapText:true};c.border=borda});
+      a.linhas.forEach((l,i)=>{
+        const row=ws.getRow(H+1+i);row.values=l.map(v=>v===""?null:v);row.height=18;
+        for(let c=1;c<=n;c++){
+          const cel=row.getCell(c);const ci=c-1;
+          cel.font={name:"Calibri",size:11,color:{argb:XC.ink}};cel.border=borda;
+          cel.alignment={vertical:"middle",horizontal:ci===0||(a.esq||[]).includes(ci)?"left":"center",wrapText:(a.quebra||[]).includes(ci)};
+          if(i%2)cel.fill={type:"pattern",pattern:"solid",fgColor:{argb:XC.zebra}};
+          if(ci===0)cel.font={...cel.font,bold:true,color:{argb:XC.navy}};
+          if((a.datas||[]).includes(ci)&&typeof cel.value==="number")cel.numFmt="dd/mm/yyyy hh:mm";
+          if((a.horas||[]).includes(ci)&&typeof cel.value==="number")cel.numFmt="0.0";
+          if((a.pct||[]).includes(ci)&&typeof cel.value==="number"){cel.numFmt="0.0%";pinta(cel,xlsTomPct(cel.value))}
+          if((a.link||[]).includes(ci)&&cel.value){const u=cel.value;cel.value={text:"Abrir mapa",hyperlink:u};cel.font={...cel.font,underline:true,color:{argb:XC.red}}}
+          const tom=xlsTom(cel.value);if(tom&&!(a.pct||[]).includes(ci))pinta(cel,tom);
+        }
+      });
+      if(a.linhas.length){ws.autoFilter={from:{row:H,column:1},to:{row:H+a.linhas.length,column:n}}}
+      ws.views=[{state:"frozen",ySplit:H,xSplit:1,showGridLines:false}];
+    }
+    const buf=await wb.xlsx.writeBuffer();
+    const url=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));
+    const lk=document.createElement("a");lk.href=url;lk.download=nomeArquivo;document.body.appendChild(lk);lk.click();lk.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    btn.textContent="Excel baixado";setTimeout(()=>btn.textContent=orig,2500);
+  }catch(e){btn.textContent="Erro ao gerar o Excel";console.error(e);setTimeout(()=>btn.textContent=orig,4000)}
+  finally{btn.disabled=false}
 }
 
 function exportar(){
-  const v=ultimaVista, n=rows.length, ok=rows.filter(r=>r.ok).length;
+  const v=ultimaVista, n=rows.length, ok=rows.filter(r=>r.ok).length, pd=n?ok/n:0;
   const U={};rows.forEach(r=>{U[r.u]=U[r.u]||{t:0,ok:0};U[r.u].t++;if(r.ok)U[r.u].ok++});
   const mapa=r=>(r.la===-1&&r.lo===-1)||r.la==null?"":`https://www.google.com/maps?q=${r.la},${r.lo}`;
   xlsGerar(`Watchdog_Carretas_Bimbo_${xlsDia(REF)}.xlsx`,[
-    {nome:"Resumo",cab:["Item","Valor"],larg:[34,48],linhas:[
-      ["Watchdog","Carretas · Bimbo Brasil"],["Dados consultados em (Brasília)",fmt(REF)],["Filtros aplicados na aba Lista",xlsFiltros()],
-      ["Total monitorado",n],["Comunicando (até 24h)",ok],["Sem comunicação (mais de 24h)",n-ok],
-      ["Disponibilidade",(n?ok/n*100:0).toFixed(1).replace(".",",")+"%"],["Registros na aba Lista",v.length]]},
-    {nome:"Por CV",cab:["Unidade","Total","Comunicando","Sem comunicação","Disponibilidade"],larg:[24,10,14,16,16],pct:[4],filtro:true,
+    {nome:"Resumo",linhas:[
+      ["Dados consultados em (Brasília)",fmt(REF)],["Filtros aplicados na aba Lista",xlsFiltros()],
+      ["Total monitorado",n],["Comunicando (até 24h)",ok,"ok"],["Sem comunicação (mais de 24h)",n-ok,n-ok?"bad":"ok"],
+      ["Disponibilidade",(pd*100).toFixed(1).replace(".",",")+"%",xlsTomPct(pd)],["Registros na aba Lista",v.length]]},
+    {nome:"Por CV",cab:["Unidade","Total","Comunicando","Sem comunicação","Disponibilidade"],larg:[26,10,15,18,17],pct:[4],
       linhas:Object.entries(U).sort((a,b)=>b[1].t-a[1].t).map(([u,x])=>[u,x.t,x.ok,x.t-x.ok,x.t?x.ok/x.t:0])},
-    {nome:"Lista",filtro:true,datas:[3],larg:[12,16,22,18,14,12,18,13,12,12,12,44],
+    {nome:"Lista",datas:[3],horas:[4],link:[11],esq:[2],larg:[13,17,22,19,14,12,18,13,13,12,12,14],
       cab:["Placa","Serial","Unidade","Última comunicação","Horas sem comunicar","Dias sem comunicar","Status","Em movimento","Velocidade (km/h)","Latitude","Longitude","Mapa"],
       linhas:v.map(r=>[r.p,r.s,r.u,xlsData(r.d),xlsNum(r.h),Math.floor(r.h/24),r.ok?"Comunicando":"Sem comunicação",r.dr?"Sim":"Não",r.sp,mapa(r)?r.la:"",mapa(r)?r.lo:"",mapa(r)])}
-  ]);
+  ],"Watchdog Carretas · Bimbo Brasil",`Relatório GEOMATICS Gestão de Frotas · dados de ${fmt(REF)} (Brasília)`);
 }
 let ultimaVista=[];
 function draw(){
