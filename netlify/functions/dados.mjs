@@ -1,7 +1,11 @@
 // Busca no MyGeotab a última comunicação das placas de uma lista
 // e devolve para a página. O resultado fica guardado por 1 hora
 // no Netlify, para não consultar o MyGeotab a cada acesso.
-import listas from "../../config/listas.mjs";
+import listasBase from "../../config/listas.mjs";
+import listasFrota, { responsavel } from "../../config/listas_frota.mjs";
+
+const listas = { ...listasBase, ...listasFrota };
+const MODELOS = ["Mobi","Logan","Voyage","Onix","Kwid","Iveco","Master","Accelo","Atego","6160","9170","17190","HR","IEV 1200T","Bongo"];
 
 const API = "https://my.geotab.com/apiv1";
 
@@ -45,7 +49,8 @@ export async function montar(nomeLista) {
     const placa = limpar(v.licensePlate) || limpar(v.name);
     if (!alvo.has(placa)) continue;
     const s = statusPorId[v.id] || {};
-    const cv = (v.groups || []).map((g) => nomeGrupo[g.id] || "").find((n) => /^\|\s*CV/i.test(n));
+    const nomesGrupo = (v.groups || []).map((g) => (nomeGrupo[g.id] || "").trim());
+    const cv = nomesGrupo.find((n) => /^\|\s*CV/i.test(n));
     rows.push({
       p: placa,
       s: v.serialNumber || "",
@@ -54,7 +59,9 @@ export async function montar(nomeLista) {
       la: typeof s.latitude === "number" ? s.latitude : -1,
       lo: typeof s.longitude === "number" ? s.longitude : -1,
       sp: Math.round(s.speed || 0),
-      dr: !!s.isDriving
+      dr: !!s.isDriving,
+      m: nomesGrupo.find((n) => MODELOS.includes(n)) || "",
+      r: responsavel[placa] || (nomesGrupo.includes("Vendedores") ? "Vendedor" : nomesGrupo.includes("Supervisão") ? "Supervisão" : nomesGrupo.includes("Patrimonial") ? "Patrimonial" : "")
     });
   }
   const achadas = new Set(rows.map((r) => r.p));
@@ -68,7 +75,7 @@ export default async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const lista = new URL(req.url).searchParams.get("lista");
   if (!listas[lista]) {
-    return Response.json({ erro: "Lista inválida. Use ?lista=carretas ou ?lista=cavalos" }, { status: 400, headers: CORS });
+    return Response.json({ erro: "Lista inválida. Use ?lista=carretas, cavalos, leves ou pesados" }, { status: 400, headers: CORS });
   }
   if (!process.env.GEOTAB_USER || !process.env.GEOTAB_PASSWORD || !process.env.GEOTAB_DATABASE) {
     return Response.json({ erro: "Faltam as credenciais do MyGeotab nas variáveis de ambiente do Netlify." }, { status: 500, headers: CORS });
