@@ -265,6 +265,7 @@ $("aging").innerHTML=B.map(([l,a,b,hot])=>`<div class="age ${hot?'hot':''}"><b>$
 $("alerts").innerHTML=bad.length?bad.map(r=>`<div class="al"><div class="top2"><span class="pl">${r.p}</span><span class="days">${dur(r.h)}</span></div>
  <div class="meta"><span>Serial ${r.s}</span><span>${r.u} · último sinal ${fmt(r.d)}</span></div>
  <a href="${gm(r)}" target="_blank" rel="noopener">Ver última posição →</a></div>`).join(""):'<div class="allok">Todos estão comunicando.</div>';
+if(!rs.length)$("alerts").innerHTML='<div class="allok" style="color:var(--muted)">Nenhum veículo neste filtro.</div>';
 }
 resumo();
 const UC={};rows.forEach(r=>UC[r.u]=(UC[r.u]||0)+1);

@@ -5,6 +5,10 @@ import listasBase from "../../config/listas.mjs";
 import listasFrota, { responsavel } from "../../config/listas_frota.mjs";
 
 const listas = { ...listasBase, ...listasFrota };
+// Canais considerados (grupos do MyGeotab com asterisco no nome)
+const CANAIS = ["Canal Auto Serviço", "Canal Tradicional", "Expedição", "Logistica", "Manutenção"];
+const semAcento = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const canalDe = (n) => CANAIS.find((c) => semAcento(c) === semAcento(n));
 const MODELOS = ["Mobi","Logan","Voyage","Onix","Kwid","Iveco","Master","Accelo","Atego","6160","9170","17190","HR","IEV 1200T","Bongo"];
 
 const API = "https://my.geotab.com/apiv1";
@@ -49,7 +53,9 @@ export async function montar(nomeLista) {
     const placa = limpar(v.licensePlate) || limpar(v.name);
     if (!alvo.has(placa)) continue;
     const s = statusPorId[v.id] || {};
-    const nomesGrupo = (v.groups || []).map((g) => (nomeGrupo[g.id] || "").trim());
+    const nomesGrupo = (v.groups || []).map((g) => (nomeGrupo[g.id] || "").replace(/\u00a0/g, " ").trim());
+    // Veículos do grupo Patrimonial ficam fora de todos os watchdogs
+    if (nomesGrupo.some((n) => semAcento(n) === "patrimonial")) continue;
     const cv = nomesGrupo.find((n) => /^\|\s*CV/i.test(n));
     rows.push({
       p: placa,
@@ -61,10 +67,12 @@ export async function montar(nomeLista) {
       sp: Math.round(s.speed || 0),
       dr: !!s.isDriving,
       m: nomesGrupo.find((n) => MODELOS.includes(n)) || "",
+      k: nomesGrupo.filter((n) => /^\*.*\*$/.test(n)).map((n) => canalDe(n.replace(/\*/g, "").replace(/\s+/g, " ").trim())).filter(Boolean),
       r: responsavel[placa] || (nomesGrupo.includes("Vendedores") ? "Vendedor" : nomesGrupo.includes("Supervisão") ? "Supervisão" : nomesGrupo.includes("Patrimonial") ? "Patrimonial" : "")
     });
   }
-  const achadas = new Set(rows.map((r) => r.p));
+  const patrimoniais = new Set(veiculos.filter((v) => (v.groups || []).some((g) => semAcento((nomeGrupo[g.id] || "").trim()) === "patrimonial")).map((v) => limpar(v.licensePlate) || limpar(v.name)));
+  const achadas = new Set([...rows.map((r) => r.p), ...patrimoniais]);
   const faltando = placas.filter((p) => !achadas.has(limpar(p)));
   return { ref: agora, rows, faltando };
 }

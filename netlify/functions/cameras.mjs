@@ -139,6 +139,8 @@ export async function montar(debug = false) {
     const h = saudePorImei[imei] || {};
     const ref = mapaPorImei[imei];
     const v = (ref && veicPorId[ref.id]) || veicPorPlaca[limpar(d.name)] || null;
+    // Veículos do grupo Patrimonial ficam fora de todos os watchdogs
+    if (v && (v.groups || []).some((g) => (nomeGrupo[g.id] || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase() === "patrimonial")) continue;
     const st = v ? statusPorId[v.id] || {} : {};
     rows.push({
       imei,
