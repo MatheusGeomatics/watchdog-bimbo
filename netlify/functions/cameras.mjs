@@ -5,6 +5,28 @@ import mapa, { ignorar } from "../../config/cameras.mjs";
 
 const SURF = process.env.SURFSIGHT_API || "https://api-prod.surfsight.net";
 const GEOTAB = "https://my.geotab.com/apiv1";
+
+// ---- Regional (SP, SUL, RJ, NE, DF) a partir da árvore de grupos do MyGeotab ----
+const REGIONAIS = { SP: "SP", RJ: "RJ", RS: "SUL", SUL: "SUL", NE: "NE", DF: "DF" };
+const REG_POR_CV = {
+  "cv raposo": "SP", "cv guarulhos": "SP", "cv anhanguera": "SP", "cv valinhos": "SP", "cv santo andre": "SP", "cv sorocaba": "SP", "cv mogi das cruzes": "SP",
+  "cv inhauma": "RJ", "cv pavuna": "RJ", "cv campo grande": "RJ", "cv sao goncalo": "RJ", "cv sao pedro": "RJ", "cv jacarepagua": "RJ",
+  "cv gravatai": "SUL", "cv sia": "DF",
+  "cv jaboatao": "NE", "cv caruaru": "NE", "cv natal": "NE", "cv joao pessoa": "NE", "cv igarassu": "NE"
+};
+const tiraAcento = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function montaRegional(grupos) {
+  const nome = {}, pai = {};
+  for (const g of grupos) { nome[g.id] = (g.name || "").trim(); for (const c of g.children || []) pai[c.id] = g.id; }
+  return (idsGrupos, cv) => {
+    for (const id of idsGrupos) {
+      let x = id, n = 0;
+      while (x && n++ < 20) { const r = REGIONAIS[(nome[x] || "").toUpperCase()]; if (r) return r; x = pai[x]; }
+    }
+    return REG_POR_CV[tiraAcento(cv)] || "";
+  };
+}
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
 const limpar = (x) => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -116,6 +138,7 @@ export async function montar(debug = false) {
   const [S, G] = await Promise.all([dadosSurfsight(), dadosGeotab()]);
 
   const nomeGrupo = Object.fromEntries(G.grupos.map((g) => [g.id, g.name || ""]));
+  const regionalDe = montaRegional(G.grupos);
   const cvDe = (v) => {
     const n = (v && v.groups || []).map((g) => nomeGrupo[g.id] || "").find((x) => /^\|\s*CV/i.test(x));
     return n ? n.replace(/\|/g, "").trim() : "";
@@ -146,6 +169,7 @@ export async function montar(debug = false) {
       imei,
       p: (v && (limpar(v.licensePlate) || limpar(v.name))) || (ref && ref.p) || String(d.name || imei),
       u: cvDe(v) || (ref && ref.cv) || "Sem unidade",
+      g: regionalDe(v ? (v.groups || []).map((x) => x.id) : [], cvDe(v) || (ref && ref.cv) || ""),
       cs: String(d.status || "").toLowerCase() || "desconhecido",
       semi: !!d.isSemiOnline,
       cv: maisRecente(d.lastSeenOnline, h.lastConnectedAt),

@@ -129,6 +129,11 @@ footer ul{margin:6px 0 0;padding-left:18px}
 .xls{font:inherit;font-weight:800;font-size:13px;padding:8px 14px;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);cursor:pointer;white-space:nowrap}
 .xls:hover{background:var(--navy);color:#fff}
 .xls:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+
+.regbar{padding:0 20px 4px}
+.regbar .seg button{font-size:12px;padding:6px 11px}
+.regbar .seg em{font-style:normal;font-weight:700;opacity:.65;margin-left:5px;font-size:11px}
+.regvazio{color:var(--muted);font-weight:700;padding:8px 0}
 </style>
 </head>
 <body>
@@ -172,6 +177,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
           <span><i class="dot" style="background:var(--red)"></i>Rodando sem câmera</span>
           <span><i class="dot" style="background:var(--gray)"></i>Ambos sem sinal</span>
         </div></div>
+      <div class="regbar"><div class="seg" id="freg" role="group" aria-label="Filtrar por regional"></div></div>
       <div class="bd" id="units"></div>
     </div>
     <div class="card">
@@ -290,20 +296,33 @@ const rows=J.rows.map(r=>{
 $("refTxt").textContent=fmt(REF); $("refFoot").textContent=fmt(REF);
 if(J.avisos&&J.avisos.length){$("avisos").hidden=false;$("avisos").textContent="Aviso: "+J.avisos.join(" · ");}
 
+const TODOS=rows;
+let freg="";
+const regOk=r=>!freg||r.g===freg;
+function montaRegBar(onchange){
+  const el=$("freg");const REG=["SP","SUL","RJ","NE","DF"];const C={};TODOS.forEach(r=>{if(r.g)C[r.g]=(C[r.g]||0)+1});
+  el.innerHTML=`<button type="button" data-v="" class="on">Todas<em>${TODOS.length}</em></button>`+REG.map(g=>`<button type="button" data-v="${g}">${g}<em>${C[g]||0}</em></button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{el.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");freg=b.dataset.v;onchange()});
+}
+const COR={ok:"var(--navy)",alerta:"var(--warn)",crit:"var(--red)",parado:"var(--gray)",semcam:"var(--red)"};
+const nomeSt={online:"Online",standby:"Standby",offline:"Offline"};
+const gm=r=>`https://www.google.com/maps?q=${r.la},${r.lo}`;
+const temGps=r=>!(r.la===-1&&r.lo===-1);
+{const UC={};rows.forEach(r=>UC[r.u]=(UC[r.u]||0)+1);$("fu").innerHTML+=Object.keys(UC).sort((a,b)=>UC[b]-UC[a]).map(k=>`<option>${esc(k)}</option>`).join("");}
+function resumo(){
+const rows=TODOS.filter(regOk);
 const n=rows.length, ok=rows.filter(r=>r.camOk).length, crit=rows.filter(r=>r.s==="crit");
 $("kTot").textContent=n; $("kOk").textContent=ok; $("kCrit").textContent=crit.length;
 const pct=n?ok/n*100:0; $("kPct").textContent=pct.toFixed(1).replace(".",",")+"%"; $("kBar").style.width=pct+"%";
 $("kTotH").textContent=`${rows.filter(r=>r.dr).length} veículos em movimento agora`;
 
 // por unidade
-const COR={ok:"var(--navy)",alerta:"var(--warn)",crit:"var(--red)",parado:"var(--gray)",semcam:"var(--red)"};
 const U={}; rows.forEach(r=>{U[r.u]=U[r.u]||{ok:0,alerta:0,crit:0,parado:0,semcam:0,t:0};U[r.u][r.s]++;U[r.u].t++});
 const uk=Object.keys(U).sort((a,b)=>U[b].t-U[a].t);
 const mx=Math.max(1,...uk.map(k=>U[k].t));
 $("units").innerHTML=uk.map(k=>{const v=U[k];const segs=["ok","alerta","crit","semcam","parado"].filter(s=>v[s]).map(s=>`<span style="width:${v[s]/v.t*100}%;background:${COR[s]}" title="${SIT[s][0]}: ${v[s]}"></span>`).join("");
  const prob=v.crit+v.semcam;
  return `<div class="hbar"><div class="nm" title="${esc(k)}">${esc(k)}</div><div><div class="tr" style="width:${v.t/mx*100}%">${segs}</div></div><div class="nb">${v.t} · <b style="color:${prob?'var(--red)':'var(--muted)'}">${prob}</b></div></div>`}).join("");
-$("fu").innerHTML+=uk.map(k=>`<option>${esc(k)}</option>`).join("");
 
 // alarmes
 const A={}; rows.forEach(r=>r.al.forEach(a=>A[a]=(A[a]||0)+1));
@@ -314,16 +333,17 @@ $("alarms").innerHTML=ak.length?ak.slice(0,7).map(([a,c])=>`<div class="alrow"><
 
 // status surfsight
 const ST={}; rows.forEach(r=>ST[r.cs]=(ST[r.cs]||0)+1);
-const nomeSt={online:"Online",standby:"Standby",offline:"Offline"};
 $("stat").innerHTML=Object.entries(ST).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="age ${k==='offline'?'hot':''}"><b>${v}</b><span>${esc(nomeSt[k]||k)}</span></div>`).join("");
 
 // cartões
-const gm=r=>`https://www.google.com/maps?q=${r.la},${r.lo}`;
-const temGps=r=>!(r.la===-1&&r.lo===-1);
 crit.sort((a,b)=>b.camH-a.camH);
 $("alerts").innerHTML=crit.length?crit.map(r=>`<div class="al"><div class="top2"><span class="pl">${esc(r.p)}</span><span class="days">${r.camH>=1e9?'câmera sem registro':'câmera '+dur(r.camH)}</span></div>
  <div class="meta"><span>${esc(r.u)} · câmera ${esc(nomeSt[r.cs]||r.cs)}</span><span>Rastreador comunicou há ${dur(r.goH)}${r.dr?` · em movimento ${r.sp} km/h`:''}</span>${r.al.length?`<span class="alw">${esc(r.alTxt)}</span>`:''}</div>
  ${temGps(r)?`<a href="${gm(r)}" target="_blank" rel="noopener">Ver posição →</a>`:''}</div>`).join(""):'<div class="allok">Nenhum veículo rodando sem câmera.</div>';
+
+if(!uk.length)$("units").innerHTML='<div class="regvazio">Nenhuma câmera nesta regional.</div>';
+}
+resumo();
 
 // tabela
 let sk="ord",sd=1,fs="";
@@ -332,7 +352,7 @@ const xlsData=t=>{if(!t)return "";const d=t instanceof Date?t:new Date(t);if(isN
 const xlsNum=(h,c=1)=>h==null||h>=1e9?"":Math.round(h*Math.pow(10,c))/Math.pow(10,c);
 const xlsDia=REF=>`${REF.getFullYear()}-${String(REF.getMonth()+1).padStart(2,"0")}-${String(REF.getDate()).padStart(2,"0")}`;
 function xlsFiltros(){
-  const f=[];const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
+  const f=[];if(freg)f.push("Regional: "+freg);const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
   const on=document.querySelector("#fs button.on");
   if(u)f.push("Unidade: "+u);
   if(on&&on.dataset.v)f.push("Situação: "+on.textContent.trim());
@@ -433,6 +453,7 @@ const auxTexto=r=>{
   return r.an>1?`${sem}/${r.an} sem sinal`:(r.auxPior==null?"Sem registro":"Sem sinal há "+dur(r.auxPior));
 };
 function exportar(){
+  const rows=TODOS.filter(regOk);
   const v=ultimaVista, n=rows.length, cam=rows.filter(r=>r.camOk).length, pd=n?cam/n:0;
   const conta=s=>rows.filter(r=>r.s===s).length;
   const U={};rows.forEach(r=>{const x=U[r.u]=U[r.u]||{t:0,ok:0,alerta:0,crit:0,parado:0,cam:0};x.t++;x[r.s==="semcam"?"crit":r.s]++;if(r.camOk)x.cam++});
@@ -455,7 +476,7 @@ function exportar(){
 let ultimaVista=[];
 function draw(){
   const q=$("q").value.trim().toLowerCase(), u=$("fu").value;
-  let v=rows.filter(r=>(!u||r.u===u)&&(!fs||r.s===fs||(fs==="crit"&&r.s==="semcam"))&&(!q||[r.p,r.imei,r.u,r.alTxt,r.cs,r.auxTxt].join(" ").toLowerCase().includes(q)));
+  let v=rows.filter(r=>regOk(r)&&(!u||r.u===u)&&(!fs||r.s===fs||(fs==="crit"&&r.s==="semcam"))&&(!q||[r.p,r.imei,r.u,r.alTxt,r.cs,r.auxTxt].join(" ").toLowerCase().includes(q)));
   v.sort((a,b)=>{let x=a[sk],y=b[sk]; if(sk==="ord"&&x===y){x=-a.camH;y=-b.camH} return (x>y?1:x<y?-1:0)*sd});
   $("tb").innerHTML=v.map(r=>`<tr><td><b style="color:var(--navy)">${esc(r.p)}</b></td><td>${esc(r.u)}</td>
    <td><span class="cs ${esc(r.cs)}">${esc(nomeSt[r.cs]||r.cs)}</span></td>
@@ -464,13 +485,14 @@ function draw(){
    <td class="altd" title="${esc(r.alTxt)}">${r.al.length?esc(r.alTxt):'—'}</td>
    <td>${temGps(r)?`<a href="${gm(r)}" target="_blank" rel="noopener">Abrir</a>`:'—'}</td></tr>`).join("");
   ultimaVista=v;
-  $("cnt").textContent=`${v.length} de ${rows.length} câmeras`;
+  $("cnt").textContent=`${v.length} de ${TODOS.filter(regOk).length} câmeras`;
 }
 document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;sd=sk===k?-sd:1;sk=k;draw()});
 $("q").oninput=draw; $("fu").onchange=draw;
 const seg=$("fs");
 seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fs=b.dataset.v;draw()});
 $("xls").onclick=exportar;
+montaRegBar(()=>{resumo();draw()});
 draw();
 })();
 </script>

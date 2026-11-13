@@ -109,6 +109,11 @@ footer ul{margin:6px 0 0;padding-left:18px}
 .xls{font:inherit;font-weight:800;font-size:13px;padding:8px 14px;border-radius:10px;border:2px solid var(--navy);background:#fff;color:var(--navy);cursor:pointer;white-space:nowrap}
 .xls:hover{background:var(--navy);color:#fff}
 .xls:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+
+.regbar{padding:0 20px 4px}
+.regbar .seg button{font-size:12px;padding:6px 11px}
+.regbar .seg em{font-style:normal;font-weight:700;opacity:.65;margin-left:5px;font-size:11px}
+.regvazio{color:var(--muted);font-weight:700;padding:8px 0}
 </style>
 </head>
 <body>
@@ -147,6 +152,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <div class="card">
       <div class="hd"><h2>Por unidade</h2>
         <div class="legend"><span><i class="dot" style="background:var(--navy)"></i>Comunicando</span><span><i class="dot" style="background:var(--red)"></i>Sem comunicação</span></div></div>
+      <div class="regbar"><div class="seg" id="freg" role="group" aria-label="Filtrar por regional"></div></div>
       <div class="bd" id="units"></div>
     </div>
     <div class="card">
@@ -231,27 +237,42 @@ const fmt=d=>`${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pa
 const dur=h=>h<1?`${Math.max(1,Math.round(h*60))} min`:h<48?`${h.toFixed(1).replace(".",",")} h`:`${Math.floor(h/24)} dias`;
 const rows=DATA.map(r=>{const d=new Date(r.t);const h=Math.max(0,(REF-d)/36e5);return {...r,d,h,ok:h<=LIM}});
 $("refTxt").textContent=fmt(REF); $("refFoot").textContent=fmt(REF); $("nTot").textContent=DATA.length; $("nTot2").textContent=DATA.length;
+const TODOS=rows;
+let freg="";
+const regOk=r=>!freg||r.g===freg;
+function montaRegBar(onchange){
+  const el=$("freg");const REG=["SP","SUL","RJ","NE","DF"];const C={};TODOS.forEach(r=>{if(r.g)C[r.g]=(C[r.g]||0)+1});
+  el.innerHTML=`<button type="button" data-v="" class="on">Todas<em>${TODOS.length}</em></button>`+REG.map(g=>`<button type="button" data-v="${g}">${g}<em>${C[g]||0}</em></button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{el.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");freg=b.dataset.v;onchange()});
+}
+const gm=r=>`https://www.google.com/maps?q=${r.la},${r.lo}`;
+{const UC={};rows.forEach(r=>UC[r.u]=(UC[r.u]||0)+1);$("fu").innerHTML+=Object.keys(UC).sort((a,b)=>UC[b]-UC[a]).map(k=>`<option>${k}</option>`).join("");}
+function resumo(){
+const rows=TODOS.filter(regOk);
+$("nTot2").textContent=rows.length;
 const ok=rows.filter(r=>r.ok), bad=rows.filter(r=>!r.ok).sort((a,b)=>b.h-a.h);
-const pct=ok.length/rows.length*100;
+const pct=rows.length?ok.length/rows.length*100:0;
 $("kTot").textContent=rows.length; $("kOk").textContent=ok.length; $("kBad").textContent=bad.length;
 $("kPct").textContent=pct.toFixed(1).replace(".",",")+"%"; $("kBar").style.width=pct+"%";
 $("kMov").textContent=`${ok.filter(r=>r.dr).length} em movimento agora`;
 
 const U={}; rows.forEach(r=>{U[r.u]=U[r.u]||{ok:0,bad:0};U[r.u][r.ok?"ok":"bad"]++});
 const uk=Object.keys(U).sort((a,b)=>(U[b].ok+U[b].bad)-(U[a].ok+U[a].bad));
-const mx=Math.max(...uk.map(k=>U[k].ok+U[k].bad));
+const mx=Math.max(1,...uk.map(k=>U[k].ok+U[k].bad));
 $("units").innerHTML=uk.map(k=>{const v=U[k],t=v.ok+v.bad;return `<div class="hbar"><div class="nm" title="${k}">${k}</div>
  <div><div class="tr" style="width:${t/mx*100}%"><span style="width:${v.ok/t*100}%;background:var(--navy)"></span><span style="width:${v.bad/t*100}%;background:var(--red)"></span></div></div>
  <div class="nb">${v.ok} · <b style="color:${v.bad?'var(--red)':'var(--muted)'}">${v.bad}</b></div></div>`}).join("");
-$("fu").innerHTML+=uk.map(k=>`<option>${k}</option>`).join("");
 
 const B=[["até 1 hora",-1,1,0],["1 a 24 horas",1,24,0],["1 a 30 dias",24,720,1],["mais de 30 dias",720,1e9,1]];
 $("aging").innerHTML=B.map(([l,a,b,hot])=>`<div class="age ${hot?'hot':''}"><b>${rows.filter(r=>r.h>a&&r.h<=b).length}</b><span>${l}</span></div>`).join("");
 
-const gm=r=>`https://www.google.com/maps?q=${r.la},${r.lo}`;
 $("alerts").innerHTML=bad.length?bad.map(r=>`<div class="al"><div class="top2"><span class="pl">${r.p}</span><span class="days">${dur(r.h)}</span></div>
  <div class="meta"><span>Serial ${r.s}</span><span>${r.u} · último sinal ${fmt(r.d)}</span></div>
  <a href="${gm(r)}" target="_blank" rel="noopener">Ver última posição →</a></div>`).join(""):'<div class="allok">Todos estão comunicando.</div>';
+if(!uk.length)$("units").innerHTML='<div class="regvazio">Nenhum veículo nesta regional.</div>';
+}
+resumo();
+
 
 let sk="h",sd=-1,fs="";
 // ---- Relatório em Excel formatado (ExcelJS, gerado no navegador) ----
@@ -259,7 +280,7 @@ const xlsData=t=>{if(!t)return "";const d=t instanceof Date?t:new Date(t);if(isN
 const xlsNum=(h,c=1)=>h==null||h>=1e9?"":Math.round(h*Math.pow(10,c))/Math.pow(10,c);
 const xlsDia=REF=>`${REF.getFullYear()}-${String(REF.getMonth()+1).padStart(2,"0")}-${String(REF.getDate()).padStart(2,"0")}`;
 function xlsFiltros(){
-  const f=[];const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
+  const f=[];if(freg)f.push("Regional: "+freg);const q=document.getElementById("q").value.trim();const u=document.getElementById("fu").value;
   const on=document.querySelector("#fs button.on");
   if(u)f.push("Unidade: "+u);
   if(on&&on.dataset.v)f.push("Situação: "+on.textContent.trim());
@@ -353,6 +374,7 @@ async function xlsGerar(nomeArquivo,abas,titulo,sub){
 }
 
 function exportar(){
+  const rows=TODOS.filter(regOk);
   const v=ultimaVista, n=rows.length, ok=rows.filter(r=>r.ok).length, pd=n?ok/n:0;
   const U={};rows.forEach(r=>{U[r.u]=U[r.u]||{t:0,ok:0};U[r.u].t++;if(r.ok)U[r.u].ok++});
   const mapa=r=>(r.la===-1&&r.lo===-1)||r.la==null?"":`https://www.google.com/maps?q=${r.la},${r.lo}`;
@@ -371,7 +393,7 @@ function exportar(){
 let ultimaVista=[];
 function draw(){
   const q=$("q").value.trim().toLowerCase(), u=$("fu").value;
-  let v=rows.filter(r=>(!u||r.u===u)&&(!fs||(fs==="ok")===r.ok)&&(!q||[r.p,r.s,r.u].join(" ").toLowerCase().includes(q)));
+  let v=rows.filter(r=>regOk(r)&&(!u||r.u===u)&&(!fs||(fs==="ok")===r.ok)&&(!q||[r.p,r.s,r.u].join(" ").toLowerCase().includes(q)));
   v.sort((a,b)=>{let x=a[sk],y=b[sk]; if(sk==="t"){x=a.d;y=b.d} return (x>y?1:x<y?-1:0)*sd});
   $("tb").innerHTML=v.map(r=>`<tr><td><b style="color:var(--navy)">${r.p}</b></td><td style="color:var(--muted)">${r.s}</td><td>${r.u}</td>
    <td>${fmt(r.d)}</td><td class="num">${dur(r.h)}</td>
@@ -379,13 +401,14 @@ function draw(){
    <td class="num">${r.dr?`<span class="mv">▶ ${r.sp} km/h</span>`:'Parado'}</td>
    <td><a href="${gm(r)}" target="_blank" rel="noopener">Abrir</a></td></tr>`).join("");
   ultimaVista=v;
-  $("cnt").textContent=`${v.length} de ${rows.length} cavalos`;
+  $("cnt").textContent=`${v.length} de ${TODOS.filter(regOk).length} cavalos`;
 }
 document.querySelectorAll("th[data-k]").forEach(th=>th.onclick=()=>{const k=th.dataset.k;sd=sk===k?-sd:1;sk=k;draw()});
 $("q").oninput=draw; $("fu").onchange=draw;
 const seg=$("fs");
 seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");fs=b.dataset.v;draw()});
 $("xls").onclick=exportar;
+montaRegBar(()=>{resumo();draw()});
 draw();
 })();
 </script>

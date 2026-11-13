@@ -13,6 +13,28 @@ const MODELOS = ["Mobi","Logan","Voyage","Onix","Kwid","Iveco","Master","Accelo"
 
 const API = "https://my.geotab.com/apiv1";
 
+// ---- Regional (SP, SUL, RJ, NE, DF) a partir da árvore de grupos do MyGeotab ----
+const REGIONAIS = { SP: "SP", RJ: "RJ", RS: "SUL", SUL: "SUL", NE: "NE", DF: "DF" };
+const REG_POR_CV = {
+  "cv raposo": "SP", "cv guarulhos": "SP", "cv anhanguera": "SP", "cv valinhos": "SP", "cv santo andre": "SP", "cv sorocaba": "SP", "cv mogi das cruzes": "SP",
+  "cv inhauma": "RJ", "cv pavuna": "RJ", "cv campo grande": "RJ", "cv sao goncalo": "RJ", "cv sao pedro": "RJ", "cv jacarepagua": "RJ",
+  "cv gravatai": "SUL", "cv sia": "DF",
+  "cv jaboatao": "NE", "cv caruaru": "NE", "cv natal": "NE", "cv joao pessoa": "NE", "cv igarassu": "NE"
+};
+const tiraAcento = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function montaRegional(grupos) {
+  const nome = {}, pai = {};
+  for (const g of grupos) { nome[g.id] = (g.name || "").trim(); for (const c of g.children || []) pai[c.id] = g.id; }
+  return (idsGrupos, cv) => {
+    for (const id of idsGrupos) {
+      let x = id, n = 0;
+      while (x && n++ < 20) { const r = REGIONAIS[(nome[x] || "").toUpperCase()]; if (r) return r; x = pai[x]; }
+    }
+    return REG_POR_CV[tiraAcento(cv)] || "";
+  };
+}
+
+
 async function chamar(url, method, params) {
   const r = await fetch(url, {
     method: "POST",
@@ -45,6 +67,7 @@ export async function montar(nomeLista) {
   ]);
 
   const nomeGrupo = Object.fromEntries(grupos.map((g) => [g.id, g.name || ""]));
+  const regionalDe = montaRegional(grupos);
   const statusPorId = Object.fromEntries(status.map((s) => [s.device && s.device.id, s]));
   const alvo = new Set(placas.map(limpar));
 
@@ -61,6 +84,7 @@ export async function montar(nomeLista) {
       p: placa,
       s: v.serialNumber || "",
       u: cv ? cv.replace(/\|/g, "").trim() : "Sem unidade",
+      g: regionalDe((v.groups || []).map((x) => x.id), cv ? cv.replace(/\|/g, "").trim() : ""),
       t: s.dateTime || "1970-01-01T00:00:00Z",
       la: typeof s.latitude === "number" ? s.latitude : -1,
       lo: typeof s.longitude === "number" ? s.longitude : -1,
