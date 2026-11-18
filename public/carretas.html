@@ -126,7 +126,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
       <h1>Carretas · Bimbo Brasil</h1>
       <div class="sub">Status de comunicação · referência <b id="refTxt"></b> (Brasília)</div>
       <div class="chips">
-        <span class="chip">Lista de <span id="nTot">…</span> placas</span>
+        <span class="chip" id="chipLista">Lista de <span id="nTot">…</span> placas</span>
         <span class="chip">Somente dispositivos ativos</span>
         <span class="chip">Sem comunicação = mais de 24h</span>
         <span class="chip">Atualização automática</span>
@@ -191,7 +191,7 @@ footer ul{margin:6px 0 0;padding-left:18px}
     <b>Notas</b>
     <ul>
       <li>Fonte: MyGeotab (Device e DeviceStatusInfo), base bimbobrasil. Dados consultados em <span id="refFoot">…</span> (horário de Brasília). A página se atualiza sozinha, com dados de no máximo 1 hora atrás.</li>
-      <li>"Unidade" vem dos grupos de CV cadastrados no MyGeotab.</li>
+      <li>"Unidade" vem dos grupos de CV cadastrados no MyGeotab. As carretas são todos os dispositivos ativos do grupo Carreta, sem os de estoque e do Patrimonial.</li>
       <li>Relatório elaborado por GEOMATICS Gestão de Frotas.</li>
     </ul>
   </footer>
@@ -230,6 +230,7 @@ try{
 }
 $("estado").hidden=true;
 const DATA = J.rows;
+if(J.grupo){const c=$("chipLista");c.innerHTML=`Grupo ${J.grupo} · <span id="nTot">${J.rows.length}</span> carretas`;}
 const REF = new Date(J.ref);
 const LIM = 24;
 const pad=n=>String(n).padStart(2,"0");

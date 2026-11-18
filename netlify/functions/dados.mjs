@@ -3,8 +3,10 @@
 // no Netlify, para não consultar o MyGeotab a cada acesso.
 import listasBase from "../../config/listas.mjs";
 import listasFrota, { responsavel } from "../../config/listas_frota.mjs";
+import porGrupo from "../../config/grupos.mjs";
 
 const listas = { ...listasBase, ...listasFrota };
+const ESTOQUE_IDS = new Set(["GroupEquipmentId", "GroupContainerId"]);
 // Canais considerados (grupos do MyGeotab com asterisco no nome)
 const CANAIS = ["Canal Auto Serviço", "Canal Tradicional", "Expedição", "Logistica", "Manutenção"];
 const semAcento = (x) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -49,7 +51,8 @@ async function chamar(url, method, params) {
 const limpar = (x) => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 export async function montar(nomeLista) {
-  const placas = listas[nomeLista];
+  const grupoAlvo = porGrupo[nomeLista];
+  const placas = grupoAlvo ? [] : listas[nomeLista];
   const auth = await chamar(API, "Authenticate", {
     database: process.env.GEOTAB_DATABASE,
     userName: process.env.GEOTAB_USER,
@@ -74,7 +77,12 @@ export async function montar(nomeLista) {
   const rows = [];
   for (const v of veiculos) {
     const placa = limpar(v.licensePlate) || limpar(v.name);
-    if (!alvo.has(placa)) continue;
+    if (grupoAlvo) {
+      const ids = (v.groups || []).map((g) => g.id);
+      if (!ids.includes(grupoAlvo.id)) continue;
+      // estoque fica de fora
+      if (ids.some((id) => ESTOQUE_IDS.has(id) || /carreta estoque/i.test(nomeGrupo[id] || ""))) continue;
+    } else if (!alvo.has(placa)) continue;
     const s = statusPorId[v.id] || {};
     const nomesGrupo = (v.groups || []).map((g) => (nomeGrupo[g.id] || "").replace(/\u00a0/g, " ").trim());
     // Veículos do grupo Patrimonial ficam fora de todos os watchdogs
@@ -98,7 +106,7 @@ export async function montar(nomeLista) {
   const patrimoniais = new Set(veiculos.filter((v) => (v.groups || []).some((g) => semAcento((nomeGrupo[g.id] || "").trim()) === "patrimonial")).map((v) => limpar(v.licensePlate) || limpar(v.name)));
   const achadas = new Set([...rows.map((r) => r.p), ...patrimoniais]);
   const faltando = placas.filter((p) => !achadas.has(limpar(p)));
-  return { ref: agora, rows, faltando };
+  return { ref: agora, rows, faltando, grupo: grupoAlvo ? grupoAlvo.nome : null };
 }
 
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" };
@@ -106,7 +114,7 @@ const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods
 export default async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const lista = new URL(req.url).searchParams.get("lista");
-  if (!listas[lista]) {
+  if (!listas[lista] && !porGrupo[lista]) {
     return Response.json({ erro: "Lista inválida. Use ?lista=carretas, cavalos, leves ou pesados" }, { status: 400, headers: CORS });
   }
   if (!process.env.GEOTAB_USER || !process.env.GEOTAB_PASSWORD || !process.env.GEOTAB_DATABASE) {
