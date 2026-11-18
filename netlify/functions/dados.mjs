@@ -93,7 +93,7 @@ export async function montar(nomeLista) {
       s: v.serialNumber || "",
       u: cv ? cv.replace(/\|/g, "").trim() : "Sem unidade",
       g: regionalDe((v.groups || []).map((x) => x.id), cv ? cv.replace(/\|/g, "").trim() : ""),
-      t: s.dateTime || "1970-01-01T00:00:00Z",
+      t: s.dateTime || null, // último registro de GPS (DeviceStatusInfo)
       la: typeof s.latitude === "number" ? s.latitude : -1,
       lo: typeof s.longitude === "number" ? s.longitude : -1,
       sp: Math.round(s.speed || 0),
